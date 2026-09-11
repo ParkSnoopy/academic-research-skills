@@ -1,0 +1,60 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull upstream and retain approved paths
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+          UPSTREAM_URL: https://github.com/Imbad0202/academic-research-skills
+          UPSTREAM_BRANCH: main
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --no-rebase --strategy=ours --no-commit --no-ff "$UPSTREAM_URL" "$UPSTREAM_BRANCH"
+
+          # Record upstream ancestry, then take its content without replacing our workflow.
+          git restore --source=FETCH_HEAD --staged --worktree -- . ':(exclude).github'
+          # `skills/` contains symlinks into these existing top-level skill folders.
+          excluded=(
+            ':(exclude)skills'
+            ':(exclude)academic-paper'
+            ':(exclude)academic-paper-reviewer'
+            ':(exclude)academic-pipeline'
+            ':(exclude)deep-research'
+            ':(top,glob,exclude)LICENSE*'
+            ':(exclude).github/workflows/sync-upstream.yml'
+          )
+          git rm -r --ignore-unmatch -- . "${excluded[@]}"
+
+          test -z "$(git ls-files -- . "${excluded[@]}")"
+          test -f LICENSE
+          test -f .github/workflows/sync-upstream.yml
+          for skill in academic-paper academic-paper-reviewer academic-pipeline deep-research; do
+            test -f "skills/$skill/SKILL.md"
+          done
+          if git rev-parse --verify --quiet MERGE_HEAD >/dev/null || ! git diff --cached --quiet; then
+            git commit -m "chore: sync upstream skills"
+            git push origin "HEAD:$TARGET_BRANCH"
+          fi
