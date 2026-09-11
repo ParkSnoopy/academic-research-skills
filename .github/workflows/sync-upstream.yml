@@ -46,7 +46,8 @@ jobs:
             ':(top,glob,exclude)LICENSE*'
             ':(exclude).github/workflows/sync-upstream.yml'
           )
-          git rm -r --ignore-unmatch -- . "${excluded[@]}"
+          # Discard excluded upstream files even though restore staged them.
+          git rm -r --force --ignore-unmatch -- . "${excluded[@]}"
 
           test -z "$(git ls-files -- . "${excluded[@]}")"
           test -f LICENSE
