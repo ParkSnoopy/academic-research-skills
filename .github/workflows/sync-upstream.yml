@@ -17,12 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: actions/checkout@v4 - Check Out Fork
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Pull upstream and retain approved paths
+      - name: bash - Merge Upstream and Retain Approved Paths
         shell: bash
         env:
           TARGET_BRANCH: ${{ github.ref_name }}
@@ -32,10 +33,9 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git pull --no-rebase --strategy=ours --no-commit --no-ff "$UPSTREAM_URL" "$UPSTREAM_BRANCH"
-
-          # Record upstream ancestry, then take its content without replacing our workflow.
-          git restore --source=FETCH_HEAD --staged --worktree -- . ':(exclude).github'
+          git fetch "$UPSTREAM_URL" "$UPSTREAM_BRANCH"
+          git merge --no-commit --no-ff FETCH_HEAD
+          git restore --source=HEAD --staged --worktree -- .github/workflows/sync-upstream.yml
           # `skills/` contains symlinks into these existing top-level skill folders.
           excluded=(
             ':(exclude)skills'
@@ -46,7 +46,7 @@ jobs:
             ':(top,glob,exclude)LICENSE*'
             ':(exclude).github/workflows/sync-upstream.yml'
           )
-          # Discard excluded upstream files even though restore staged them.
+          # Discard only excluded upstream paths.
           git rm -r --force --ignore-unmatch -- . "${excluded[@]}"
 
           test -z "$(git ls-files -- . "${excluded[@]}")"
