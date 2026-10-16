@@ -34,7 +34,12 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch "$UPSTREAM_URL" "$UPSTREAM_BRANCH"
-          git merge --no-commit --no-ff FETCH_HEAD
+          if ! git merge --no-commit --no-ff FETCH_HEAD; then
+            test "$(git ls-files --unmerged)" != ""
+            git diff --name-only --diff-filter=U -z |
+              git --literal-pathspecs restore --source=FETCH_HEAD --staged --worktree \
+                --pathspec-from-file=- --pathspec-file-nul
+          fi
           git restore --source=HEAD --staged --worktree -- .github/workflows/sync-upstream.yml
           # `skills/` contains symlinks into these existing top-level skill folders.
           excluded=(
@@ -49,7 +54,7 @@ jobs:
           # Discard only excluded upstream paths.
           git rm -r --force --ignore-unmatch -- . "${excluded[@]}"
 
-          test -z "$(git ls-files -- . "${excluded[@]}")"
+          test "$(git ls-files -- . "${excluded[@]}")" = ""
           test -f LICENSE
           test -f .github/workflows/sync-upstream.yml
           for skill in academic-paper academic-paper-reviewer academic-pipeline deep-research; do
