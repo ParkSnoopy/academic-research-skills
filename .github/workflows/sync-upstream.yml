@@ -42,21 +42,32 @@ jobs:
           fi
           git restore --source=HEAD --staged --worktree -- .github/workflows/sync-upstream.yml
           # `skills/` contains symlinks into these existing top-level skill folders.
-          excluded=(
-            ':(exclude)skills'
-            ':(exclude)academic-paper'
-            ':(exclude)academic-paper-reviewer'
-            ':(exclude)academic-pipeline'
-            ':(exclude)deep-research'
-            ':(top,glob,exclude)LICENSE*'
-            ':(exclude).github/workflows/sync-upstream.yml'
+          retained=(
+            LICENSE
+            NOTICE.md
+            THIRD_PARTY.md
+            .github/workflows/sync-upstream.yml
+            skills/
+            academic-paper/
+            academic-paper-reviewer/
+            academic-pipeline/
+            deep-research/
+            sr-screener/
+            agents/
+            shared/
+            scripts/
+            commands/
           )
+          excluded=(':(top,glob,exclude)LICENSE*')
+          for file in "${retained[@]}"; do
+            excluded+=(":(top,exclude,literal)$file")
+          done
           # Discard only excluded upstream paths.
           git rm -r --force --ignore-unmatch -- . "${excluded[@]}"
 
-          test "$(git ls-files -- . "${excluded[@]}")" = ""
           test -f LICENSE
           test -f .github/workflows/sync-upstream.yml
+          test "$(git ls-files -- . "${excluded[@]}")" = ""
           for skill in academic-paper academic-paper-reviewer academic-pipeline deep-research; do
             test -f "skills/$skill/SKILL.md"
           done
